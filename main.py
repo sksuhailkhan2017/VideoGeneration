@@ -14,7 +14,7 @@ def generate_script_gemini(prompt):
     genai.configure(api_key="AIzaSyCmwU30Y5Y4En8hLIR51710YEKbUIKLMmo")
 
     model = genai.GenerativeModel(
-        model_name='gemini-1.5-pro',
+        model_name='gemini-1.5-flash',
         tools='code_execution')
 
     response = model.generate_content(f'write 100 words on this topic : {prompt}')
@@ -34,7 +34,7 @@ def fetch_stock_footage(prompt):
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
        
-        return [video['videos']["small"]["url"] for video in response.json().get('hits', [])]
+        return [video['videos']["tiny"]["url"] for video in response.json().get('hits', [])]
     else:
         print(f"Error: {response.status_code}")
         print(response.text)  # Print the error message from the response
@@ -98,3 +98,7 @@ if st.button("Generate Video"):
                     st.error("Failed to create video.")
             else:
                 st.error("No stock footage found for the given prompt.")
+
+
+
+#  generate script after fetching stock videos and give prompt for timestamp.
