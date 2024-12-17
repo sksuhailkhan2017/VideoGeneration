@@ -79,7 +79,7 @@ def generate_script_gemini(instruction, brand_name=None, tag_line=None, sale=Non
                                       Prepare a script for INSTRUCTION:"General purpose {instruction}".
                                                            {other_information}
                                       
-                                      Pattern: [<str>,<str>] make one short and another a longer sentence for each.
+                                      Pattern: [<str>,<str>] make one short sentence of 15 words and another a longer sentence of 50 words for each.
                                       HINT: Based on this generated test we are going to gather the videos so just keep it general and try to observe the information from the INSTRUCTION itself.
                                       NOTE: Response should be a list of text only. as [[<str>,<str>], [<str>,<str>]...]. Only return this list in python tags.
                                       MAKE SURE TO KEEP EACH TEXT WITHIN 70 CHARACTERS EACH'''

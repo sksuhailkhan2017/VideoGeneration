@@ -21,7 +21,7 @@ def generate_script_gemini(instruction, time_spans:list=[3 for i in range(10)]):
                                       Since I have merged few videos of different time span to make this video, Consider the script to be divided into the repective time-spans in the list:
                                       [{", ".join(time_spans)}],
                                       Prepare a script for INSTRUCTION:"{instruction}".
-                                      HINT: Keep this very elgant and to the point while keeping the contnet very engaging based on the INSTRUCTION given.
+                                      HINT: Keep this very elegant and to the point while keeping the content very engaging based on the INSTRUCTION given.
                                       NOTE: Response should be a list of text only.''')
 
     return response.text
