@@ -7,17 +7,22 @@ from urllib.parse import quote_plus
 
 # Constants
 PEXELS_API_KEY = "WfRAG5IUtSN3kSHJCXJswuGA6MfqQbRnc6ZvxQqi4Z1vXjXSgdCydi2j"
+GEMINI_KEY = "AIzaSyCmwU30Y5Y4En8hLIR51710YEKbUIKLMmo"
 
 
-
-def generate_script_gemini(prompt):
-    genai.configure(api_key="AIzaSyCmwU30Y5Y4En8hLIR51710YEKbUIKLMmo")
+def generate_script_gemini(instruction, time_spans:list=[3 for i in range(10)]):
+    genai.configure(api_key=GEMINI_KEY)
 
     model = genai.GenerativeModel(
         model_name='gemini-1.5-flash',
         tools='code_execution')
 
-    response = model.generate_content(f'write 100 words on this topic : {prompt}')
+    response = model.generate_content(f'''Based on the prompt prepare a video ad script that will be displayed over the video as subtitles.
+                                      Since I have merged few videos of different time span to make this video, Consider the script to be divided into the repective time-spans in the list:
+                                      [{", ".join(time_spans)}],
+                                      Prepare a script for INSTRUCTION:"{instruction}".
+                                      HINT: Keep this very elgant and to the point while keeping the contnet very engaging based on the INSTRUCTION given.
+                                      NOTE: Response should be a list of text only.''')
 
     return response.text
 
