@@ -83,6 +83,20 @@ def generate_script_gemini(instruction, brand_name=None, tag_line=None, sale=Non
     if brand_name_desc or tag_line_desc or sale_desc: other_information = "Other_information: "+", ".join([brand_name_desc,tag_line_desc,sale_desc])
     else: other_information=""
 
+<<<<<<< HEAD
+    prompt=f'''Based on the instruction prepare a video ad script that will be displayed over the video as subtitles.
+                                      Since I have merged few videos of different time span to make this video, Consider the script to be divided into the repective time-spans in the list:
+                                      {str(time_spans)},
+                                      
+                                      Prepare a script for INSTRUCTION:"General purpose {instruction}".
+                                                           {other_information}
+                                      
+                                      Pattern: [<str>,<str>] make one short sentence of 15 words and another a longer sentence of 50 words for each.
+                                      HINT: Based on this generated test we are going to gather the videos so just keep it general and try to observe the information from the INSTRUCTION itself.
+                                      NOTE: Response should be a list of text only. as [[<str>,<str>], [<str>,<str>]...]. Only return this list in python tags.
+                                      MAKE SURE TO KEEP EACH TEXT WITHIN 70 CHARACTERS EACH'''
+    response = model.generate_content(prompt)
+=======
     # prompt=f'''Based on the instruction prepare a video ad script that will be displayed over the video as subtitles.
     # Since I have merged few videos of different time span to make this video, Consider the script to be divided into the repective time-spans in the list:
     # {str(time_spans)},
@@ -136,6 +150,7 @@ A list of pairs in the format:
 <BEGIN> [['Snowy mountain peak', 'A majestic view of snow-covered peaks under the clear blue sky.'], ['City skyline at dusk', 'The city lights begin to glow as the sun sets over the horizon.'], ['Forest trail morning sunlight', 'Sunlight filters through tall trees, illuminating a quiet forest path.']] <END>
 ```
 '''
+>>>>>>> f804f869d71521efc53788ddb6a1134e0cca0405
     print(prompt)
     response = model.generate_content(prompt)
     print("response:", response)
