@@ -8,13 +8,16 @@ import random
 import asyncio
 import json
 import re
+from merge_all import merge_all_clips
 
 # Constants
 PEXELS_API_KEY = "WfRAG5IUtSN3kSHJCXJswuGA6MfqQbRnc6ZvxQqi4Z1vXjXSgdCydi2j"
 GEMINI_KEY = "AIzaSyCmwU30Y5Y4En8hLIR51710YEKbUIKLMmo"
-secs = 10
-secs_for_each_clip = 10
-number_of_clips_to_merge = secs // secs_for_each_clip
+secs = 30
+secs_for_each_clip = 6
+number_of_clips_to_merge = (secs // secs_for_each_clip)*2
+
+os.makedirs("outputs", exist_ok=True)
 
 def extract_list_from_text(text):
     """
@@ -39,7 +42,15 @@ def extract_list_from_text(text):
         return items
     return []
 
-def fetch_stock_footage(instruction):
+def fetch_stock_footage_pexels(prompt):
+    url = f"https://api.pexels.com/videos/search?query={prompt}&size=large&orientation=portrait&per_page=5"
+    headers = {"Authorization": "WfRAG5IUtSN3kSHJCXJswuGA6MfqQbRnc6ZvxQqi4Z1vXjXSgdCydi2j"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return [video['video_files'][0]['link'] for video in response.json().get('videos', [])]
+    return []
+
+def fetch_stock_footage_pixabay(instruction):
     encoded_instruction = quote_plus(instruction)  # Encodes spaces as +
     print(encoded_instruction)
     url = f"https://pixabay.com/api/videos/?key=47559207-6a059c5662f5f2564ce2379f2&q={instruction}&orientation=vertical&per_page=5"
@@ -72,21 +83,79 @@ def generate_script_gemini(instruction, brand_name=None, tag_line=None, sale=Non
     if brand_name_desc or tag_line_desc or sale_desc: other_information = "Other_information: "+", ".join([brand_name_desc,tag_line_desc,sale_desc])
     else: other_information=""
 
-    prompt=f'''Based on the instruction prepare a video ad script that will be displayed over the video as subtitles.
-                                      Since I have merged few videos of different time span to make this video, Consider the script to be divided into the repective time-spans in the list:
-                                      {str(time_spans)},
-                                      
-                                      Prepare a script for INSTRUCTION:"General purpose {instruction}".
-                                                           {other_information}
-                                      
-                                      Pattern: [<str>,<str>] make one short and another a longer sentence for each.
-                                      HINT: Based on this generated test we are going to gather the videos so just keep it general and try to observe the information from the INSTRUCTION itself.
-                                      NOTE: Response should be a list of text only. as [[<str>,<str>], [<str>,<str>]...]. Only return this list in python tags.
-                                      MAKE SURE TO KEEP EACH TEXT WITHIN 70 CHARACTERS EACH'''
-    response = model.generate_content(prompt)
+    # prompt=f'''Based on the instruction prepare a video ad script that will be displayed over the video as subtitles.
+    # Since I have merged few videos of different time span to make this video, Consider the script to be divided into the repective time-spans in the list:
+    # {str(time_spans)},
+    
+    # Prepare a script for INSTRUCTION:"General purpose {instruction}".
+    #                     {other_information}
+    
+    # Pattern: [<str>,<str>] make one short and another a longer sentence for each.
+    # HINT: Based on this generated test we are going to gather the videos so just keep it general and try to observe the information from the INSTRUCTION itself.
+    # Example Output: 
+    #     [[<short_sentence_1>, <longer_sentence_1>], [<short_sentence_2>, <longer_sentence_2>], ...]`
+    
+    # NOTE: Response should be a list of text only. as [[<str>,<str>], [<str>,<str>]...]. Only return this list in python tags.
+    
+    # MAKE SURE TO KEEP EACH LONGER SENTENCES WITHIN 50 WORDS and SHORTER SENTENCES IN 5 WORDS ONLY'''
+
+    prompt = f'''Prepare a video ad script that will appear as subtitles over a merged video containing different time spans, as provided:  
+{str(time_spans)}  
+
+**INSTRUCTION**: "General purpose {instruction}"  
+{other_information}  
+
+**Output Pattern**:  
+A list of pairs in the format:  
+`[[<short_sentence_with_keywords>, <longer_sentence>], [<short_sentence_with_keywords>, <longer_sentence>], ...]`  
+
+- **Short Sentence**: 5 words or fewer, containing visually concrete and specific keywords.  
+    - Examples: "Cheetah running", "Rainy street", "Sunset beach".  
+    - Avoid vague phrases like "beautiful view" or "emotional moment".  
+- **Longer Sentence**: Descriptive context (within 50 words) that complements the short sentence.  
+
+**HINTS**:  
+- Use short sentences as **searchable visual keywords** for matching relevant background visuals.  
+- If a sentence lacks clarity, combine it with context from nearby sentences to infer the correct visual keywords.  
+- Use **English only** in the responses.  
+
+**EXPECTED RESPONSE**:  
+```
+<BEGIN> [[<short_sentence_1>, <longer_sentence_1>], [<short_sentence_2>, <longer_sentence_2>], ...] <END>
+```
+
+**Response Guidelines**:  
+1. Strictly return a **nested list** formatted as specified above.  
+2. **Do not include** additional items, notes, symbols, or encodings (e.g., no `\u201c` or explanations).  
+3. Ensure:  
+    - Short sentences are visually specific and contain 5 words or fewer.  
+    - Longer sentences are descriptive, stay upto 50 words, and relate to the short sentence.  
+
+**Example Response**:  
+```
+<BEGIN> [['Snowy mountain peak', 'A majestic view of snow-covered peaks under the clear blue sky.'], ['City skyline at dusk', 'The city lights begin to glow as the sun sets over the horizon.'], ['Forest trail morning sunlight', 'Sunlight filters through tall trees, illuminating a quiet forest path.']] <END>
+```
+'''
     print(prompt)
-    script= extract_list_from_text(response.text)
-    return (script, response.text)
+    response = model.generate_content(prompt)
+    print("response:", response)
+    script=[]
+    for i in response.parts:
+        try:
+            d=i.text
+            script= eval((d[d.find("<BEGIN>")+7:d.find("<END>")]).strip())
+            break
+        except:
+            pass
+
+    gemini_response_dict=[{
+        "instruction":instruction,
+        "prompt":prompt,
+        "response":response.parts[0].text,
+        "script":script
+    }]
+    open("gemini_response.json", "w").write(json.dumps(gemini_response_dict))
+    return (script, response)
 
 async def filter_videos_by_resolution(payload, width, height, limit=1):
     selected_videos = []
@@ -105,6 +174,25 @@ async def filter_videos_by_resolution(payload, width, height, limit=1):
                     "size": video.get("size"),
                     "thumbnail": video.get("thumbnail"),
                 })
+    
+    return selected_videos[:limit]
+
+async def filter_videos_by_resolution_pexels(payload, width, height, limit=1):
+    selected_videos = []
+    
+    for object in payload.get("videos", []):
+        if object.get("width") == width and object.get("height") == height:
+            selected_videos.append({
+                "id": object.get("id"),
+                "type": object.get("type"),
+                "duration": object.get("duration"),
+                "pageURL": object.get("pageURL"),
+                "video_url": object.get("url"),
+                "width": object.get("width"),
+                "height": object.get("height"),
+                "size": object.get("size"),
+                "thumbnail": object.get("thumbnail"),
+            })
     
     return selected_videos[:limit]
 
@@ -193,26 +281,30 @@ def create_video_clips(video_data, output_folder="clips", clip_duration=5, rando
 
 if __name__=="__main__":
 
-    gemini_response, raw = generate_script_gemini(instruction="ads for employee monitoring system softwares", brand_name="EMP Monitor", tag_line="Time matters", sale=True,time_spans=[secs_for_each_clip for i in range(number_of_clips_to_merge)])
+    gemini_response, raw = generate_script_gemini(instruction="A musing company ad which sells good quality music albums", brand_name="T series", tag_line=None, sale=True,time_spans=[secs_for_each_clip for i in range(number_of_clips_to_merge)])
 
     print(gemini_response)
     print("Gemini responses: ", len(gemini_response))
 
     clips_and_caption=[]
-    for ind, text in enumerate(gemini_response):
+    for ind, texts in enumerate(gemini_response):
         try:
+            text=texts[0]
             if text and text.strip()!="":
-                video_raw_from_pixabay=fetch_stock_footage(text)
-                open(f"fetched_videos_{ind}.json", "w").write(json.dumps(video_raw_from_pixabay))
+                video_raw_from_pixabay=fetch_stock_footage_pexels(text)
+                open(f".\\logs\\fetched_videos_{ind}.json", "w").write(json.dumps(video_raw_from_pixabay))
                 if video_raw_from_pixabay!=[]:
-                    filtered_videos = asyncio.run(filter_videos_by_resolution(payload=video_raw_from_pixabay, width=1280, height=720, limit=1))
+                    filtered_videos = asyncio.run(filter_videos_by_resolution_pexels(payload=video_raw_from_pixabay, width=1280, height=720, limit=1))
                     if filtered_videos!=[]:
-                        vid_clips_output = create_video_clips(filtered_videos, output_folder="clips", clip_duration=5, random_choice=True, number_of_clips=1)
+                        vid_clips_output = create_video_clips(filtered_videos, output_folder="clips", clip_duration=secs_for_each_clip//2, random_choice=True, number_of_clips=1)
                         if vid_clips_output!=[]:
-                            clips_and_caption.append({"clip":vid_clips_output[0]["clips"], "caption":text})
+                            clips_and_caption.append({"clip":vid_clips_output[0]["clips"], "caption":texts[-1]})
         except Exception as e:
             print(e)
             continue
         
-    open(f"clips_and_captions.json", "w").write(json.dumps(clips_and_caption))
+    open(f".\\logs\\clips_and_captions.json", "w").write(json.dumps(clips_and_caption))
     print(clips_and_caption)
+
+    if merge_all_clips(clips_and_caption):
+        print("Complete.")
